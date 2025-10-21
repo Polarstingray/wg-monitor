@@ -1,1 +1,15 @@
 # wg-monitor
+
+
+purpuse:
+    checks for recently connectected wireguard peers and if they are reachable.
+    a wireguard connection renews it's handshake ever 120 seconds, if the latest hadnshaek was
+    <= 120 seconds, its then pinged to see if it is accessible by the server. 
+    the endpoint, ip, recency (boolean), latest handshake, and transfer info are logged the terminal.
+
+
+
+
+Future plans:
+    automatically disconnected peers that have used too much data.
+    if a peer's transfer exceeds a certain amount, temp block them from using.
