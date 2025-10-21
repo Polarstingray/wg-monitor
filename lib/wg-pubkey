@@ -1,0 +1,2 @@
+#!/bin/bash
+docker exec wireguard wg show all | grep -vE 'private key|public key|preshared key|latest|transfer|listening|interface|endpoint'
