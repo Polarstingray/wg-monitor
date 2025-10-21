@@ -1,30 +1,31 @@
 
 #!/bin/python3
 
-import subprocess
-import os
-import json
+from subprocess import run
+from os import path, system
+from json import load
 from time import sleep
+from sys import stdout
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-LIB_DIR = os.path.join(BASE_DIR, "lib")
-CONFIG_DIR = os.path.join(BASE_DIR, "config")
+BASE_DIR = path.dirname(path.abspath(__file__))
+LIB_DIR = path.join(BASE_DIR, "lib")
+CONFIG_DIR = path.join(BASE_DIR, "config")
 
 peer_states = {}
 
-with open(os.path.join(CONFIG_DIR, "ip_map.json")) as f:
-        IP_MAP = json.load(f)
+with open(path.join(CONFIG_DIR, "ip-map.json")) as f:
+    IP_MAP = load(f)
 
 def get_peer_name(ip):
     return IP_MAP.get(ip, "Unknown peer")
 
 def run_wg_command(command="wg-show-handshake", args=""):
-    """Run a shell command and return its output."""
+    """Run a command from library and return its output."""
     cmd = [f"{LIB_DIR}/{command}"]
     if args:
         cmd.append(args)
     
-    result = subprocess.run(cmd, text=True, timeout=2, capture_output=True)
+    result = run(cmd, text=True, timeout=2, capture_output=True)
     if result.returncode != 0:
         raise Exception(f"Command failed: {cmd}\n{result.stderr}")
     return result.stdout.strip()
@@ -48,21 +49,37 @@ def parse_wg_output(output):
             if key == "latest handshake":
                 value = format_time(value)
                 is_recent = is_recent_handshake(value)
-                peer_dict["is_recent"] = is_recent
+                peer_dict["is recent"] = is_recent
             elif key == "allowed ips":
-                value = value[:value.find("/")] # extract only the IP address part
+                key, value = "ip", value[:value.find("/")] # extract only the IP address part
+            elif key == "transfer":
+                value = format_transfer(value)
+            elif key == "endpoint":
+                value = format_endpoint(value)
+                
             peer_dict[key] = value
 
-        peers[get_peer_name(peer_dict["allowed ips"])] = peer_dict
+        peers[get_peer_name(peer_dict["ip"])] = peer_dict
     return peers
 
-def get_recent_handshakes(peers):
+def format_endpoint(value) :
+    endpoint = {}
+    tmp = value.split(":")
+    endpoint["ip"] = tmp[0]
+    endpoint["port"] = tmp[1]
+    return endpoint
+
+def format_transfer(value) :
+    transfer, tmp = {}, value.split(", ")
+    tmp[0], tmp[1] = tmp[0].split(" ")[:-1], tmp[1].split(" ")[:-1]
+    transfer["recieved"] = {tmp[1][1] : tmp[1][0]}
+    transfer["sent"] = {tmp[0][1] : tmp[0][0]}
+    return transfer
+
+def get_connected(peers):
     recent_peers = {}
     for name, peer_info in peers.items():
-        if peer_info.get("is_recent") and is_reachable(peer_info.get("allowed ips")):
-            # ip = peer_info.get("allowed ips")
-            # reachable = is_reachable(peer_info.get("allowed ips"))
-            # print(f'wg-ping {ip} -- {reachable}')
+        if peer_info.get("is recent") and is_reachable(peer_info.get("ip")):
             recent_peers[name] = peer_info
     return recent_peers
 
@@ -106,27 +123,39 @@ def is_recent_handshake(handshake_time):
 
 
 def monitor_wg(interval=5): 
-    
     while True:
-        print("="*20 + " Checking for recent handshakes " + "="*20)
-        output = run_wg_command()
-        peers = parse_wg_output(output)
-        connected = get_recent_handshakes(peers)
+        try :
+            output = run_wg_command()
+            peers = parse_wg_output(output)
+            connected = get_connected(peers)
+            disconnected = [k for k in peers.keys() if k not in connected.keys()]
 
-        disconnected = [k for k in peers.keys() if k not in connected.keys()]
+            system('clear')
+            print("="*20 + "Peer Status" + "="*20)
+            for peer, peer_info in connected.items():
+                print(f"[+] Recent handshake for peer: \n{peer}: {peer_info}")
 
-        for allowed_ips, peer_info in connected.items():
-            print(f"[+] Recent handshake for peer: \n{allowed_ips}: {peer_info}")
+            for peer in disconnected:
+                print(f"[-] Disconnected peer: \n{peer}: {peers[peer]}")
 
-        for peer in disconnected:
-            print(f"[-] Disconnected peer: \n{peer}: {peers[peer]}")
+            delay(interval, verbose=True)
 
+        except Exception as e:
+            print(f"Error: {e}")
+
+def delay(interval=5, verbose=False) :
+    if (verbose) :
+        for i in range(1, interval+1) :
+            sleep(1)
+            if i % interval == 0 :
+                print(".")
+                stdout.write("\033[1A" + "\x1b[2K") # ANSI esc seq for cursor up + clear line
+            else :
+                print(".", end="")
+            stdout.flush()
+    else :
         sleep(interval)
-
-def main():
-    monitor_wg()
-
+        
 
 if __name__ == "__main__":
-    main()
-       
+    monitor_wg()
