@@ -4,16 +4,17 @@
 from os import path, system
 from time import sleep
 from sys import stdout
-from wg_api import WgAPI
+from wg_api import wg_api
 
 
 def monitor_wg(interval=5): 
+
     while True:
         try :
-            output = WgAPI.run_wg_command()
-            peers = WgAPI.parse_wg_output(output)
-            connected = WgAPI.get_connected(peers)
-            disconnected = [k for k in peers.keys() if k not in connected.keys()]
+            output = wg_api.run_wg_command()
+            peers = wg_api.parse_wg_output(output)
+            connected = wg_api.get_connected(peers)
+            disconnected = [k for k in peers.keys() if k not in connected.keys()] # peers xor connected
 
             system('clear')
             print("="*20 + "Peer Status" + "="*20)
