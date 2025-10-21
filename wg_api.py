@@ -54,7 +54,7 @@ class WgAPI :
                     case "latest handshake":
                         value = self.format_time(value)
                         is_recent = self.is_recent_handshake(value)
-                        peer_dict["is recent"] = is_recent
+                        peer_dict["connected"] = is_recent
                     case "allowed ips":
                         key, value = "ip", value[:value.find("/")] # extract only the IP address part
                     case "transfer":
@@ -78,7 +78,7 @@ class WgAPI :
     def get_connected(self, peers):
         recent_peers = {}
         for name, peer_info in peers.items():
-            if peer_info.get("is recent") and self.is_reachable(peer_info.get("ip")):
+            if peer_info.get("connected") : #and self.is_reachable(peer_info.get("ip")):
                 recent_peers[name] = peer_info
         return recent_peers
 
