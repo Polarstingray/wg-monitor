@@ -8,22 +8,13 @@ from wg_api import wg_api
 import json, tempfile
 from datetime import datetime
 
-
-# BASE_DIR = path.dirname(path.abspath(__file__))
-# STATE_FILE = path.join(BASE_DIR, "tmp/state.json")
-# makedirs(path.join(BASE_DIR, "tmp/"), exist_ok=True)
-
-# LOG_FILE = path.join(BASE_DIR, "log/connections.log")
-# makedirs(path.join(BASE_DIR, "tmp/"), exist_ok=True)
-
-
 BASE_DIR = path.dirname(path.abspath(__file__))
 STATE_FILE = path.join(BASE_DIR, "tmp/state.json")
 makedirs(path.join(BASE_DIR, "tmp/"), exist_ok=True)
 
-LOG_FILE = path.join(BASE_DIR, "log/connections.log")
+CONNECTIONS_LOG = path.join(BASE_DIR, "log/connections.log")
+DISCONNECTIONS_LOG = path.join(BASE_DIR, "log/disconnections.log")
 makedirs(path.join(BASE_DIR, "log/"), exist_ok=True)
-
 
 def write_to_json(peers, filepath=STATE_FILE) :
     dirpath = path.dirname(filepath)
@@ -34,14 +25,14 @@ def write_to_json(peers, filepath=STATE_FILE) :
         tempname = tmpfile.name
     replace(tempname, filepath)
         
-def log(peers, status_=0) :
+def log(peers, filepath=CONNECTIONS_LOG, status_=0) :
     print(peers)
     update = ''
     status = '[+] UP' if (status_ == 0) else '[-] DOWN'
     for name, peer_info in peers.items() :
         update += f'{status} {name} [{peer_info.get("ip")}] from [{peer_info.get('endpoint').get('ip')}] - {str(datetime.now())}\n'
 
-    with open(LOG_FILE, 'a') as log :
+    with open(filepath, 'a') as log :
         log.write(update)
 
 def monitor_wg(interval=5): 
@@ -54,13 +45,13 @@ def monitor_wg(interval=5):
 
             curr_peers = set(connected.keys())
             if curr_peers != prev_states:
-                write_to_json(connected)
-                difference = list(curr_peers - prev_states)
-                newly_connected = {}
-                for key in difference :
-                    newly_connected[key] = connected.get(key)
+                write_to_json(peers) # update all states in tmp/state.json
+                newly_connected = list(curr_peers - prev_states)
+                newly_disconnected = list(prev_states - curr_peers)
                 if newly_connected :
-                    log(newly_connected)
+                    log({k: connected[k] for k in newly_connected}, status_=0)
+                if newly_disconnected :
+                    log({k : peers[k] for k in newly_disconnected}, filepath=DISCONNECTIONS_LOG, status_=1)
             prev_states = curr_peers
 
             system('clear')
