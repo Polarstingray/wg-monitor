@@ -6,13 +6,26 @@ from time import sleep
 from sys import stdout
 from wg_api import wg_api
 import json, tempfile
+from datetime import datetime
+
+
+# BASE_DIR = path.dirname(path.abspath(__file__))
+# STATE_FILE = path.join(BASE_DIR, "tmp/state.json")
+# makedirs(path.join(BASE_DIR, "tmp/"), exist_ok=True)
+
+# LOG_FILE = path.join(BASE_DIR, "log/connections.log")
+# makedirs(path.join(BASE_DIR, "tmp/"), exist_ok=True)
 
 
 BASE_DIR = path.dirname(path.abspath(__file__))
 STATE_FILE = path.join(BASE_DIR, "tmp/state.json")
 makedirs(path.join(BASE_DIR, "tmp/"), exist_ok=True)
 
-def write_to_file(peers, filepath=STATE_FILE) :
+LOG_FILE = path.join(BASE_DIR, "log/connections.log")
+makedirs(path.join(BASE_DIR, "log/"), exist_ok=True)
+
+
+def write_to_json(peers, filepath=STATE_FILE) :
     dirpath = path.dirname(filepath)
     with tempfile.NamedTemporaryFile("w", dir=dirpath, delete=False) as tmpfile :
         json.dump(peers, tmpfile, indent=2)
@@ -21,22 +34,34 @@ def write_to_file(peers, filepath=STATE_FILE) :
         tempname = tmpfile.name
     replace(tempname, filepath)
         
+def log(peers, status_=0) :
+    print(peers)
+    update = ''
+    status = '[+] UP' if (status_ == 0) else '[-] DOWN'
+    for name, peer_info in peers.items() :
+        update += f'{status} {name} [{peer_info.get("ip")}] from [{peer_info.get('endpoint').get('ip')}] - {str(datetime.now())}\n'
+
+    with open(LOG_FILE, 'a') as log :
+        log.write(update)
 
 def monitor_wg(interval=5): 
     prev_states = set()
     while True:
         try :
-            output = wg_api.run_wg_command()
-            peers = wg_api.parse_wg_output(output)
+            peers = wg_api.get_peers()
             connected = wg_api.get_connected(peers)
             disconnected = [k for k in peers.keys() if k not in connected.keys()] # peers xor connected
 
             curr_peers = set(connected.keys())
-
             if curr_peers != prev_states:
-                write_to_file(connected)
+                write_to_json(connected)
+                difference = list(curr_peers - prev_states)
+                newly_connected = {}
+                for key in difference :
+                    newly_connected[key] = connected.get(key)
+                if newly_connected :
+                    log(newly_connected)
             prev_states = curr_peers
-                
 
             system('clear')
             print("="*20 + "Peer Status" + "="*20)

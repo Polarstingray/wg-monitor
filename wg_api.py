@@ -18,7 +18,7 @@ class WgAPI :
     def get_peer_name(self, ip):
         return self.ip_map.get(ip, "Unknown peer")
 
-    def run_wg_command(self, command="wg-show-handshake", *args):
+    def run_wg_command(self, command, *args):
         """Run a command from library and return its output."""
         cmd_path = path.join(self.lib_dir, command)
         cmd = [cmd_path] + list(args)
@@ -27,6 +27,10 @@ class WgAPI :
             return result.stdout.strip()
         except Exception as e:
             raise RuntimeError(f"[WgAPI] Command failed: {' '.join(cmd)} — {e}")
+        
+    def get_peers(self) :
+            output = self.run_wg_command(command="wg-show-handshake")
+            return self.parse_wg_output(output)
 
     def parse_wg_output(self, output):
         """Parse the output of the wg command into a structured format."""
