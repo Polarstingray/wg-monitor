@@ -1,21 +1,26 @@
 
 #!/bin/python3
 
-from os import path, system, makedirs
+from os import path, system, makedirs, fsync, replace
 from time import sleep
 from sys import stdout
 from wg_api import wg_api
-import json
+import json, tempfile
 
 
 BASE_DIR = path.dirname(path.abspath(__file__))
 STATE_FILE = path.join(BASE_DIR, "tmp/state.json")
 makedirs(path.join(BASE_DIR, "tmp/"), exist_ok=True)
 
-def write_to_file(peers) :
-    with open(STATE_FILE, 'w') as f :
-        json.dump(peers, f, indent=2)
-    return
+def write_to_file(peers, filepath=STATE_FILE) :
+    dirpath = path.dirname(filepath)
+    with tempfile.NamedTemporaryFile("w", dir=dirpath, delete=False) as tmpfile :
+        json.dump(peers, tmpfile, indent=2)
+        tmpfile.flush()
+        fsync(tmpfile.fileno())
+        tempname = tmpfile.name
+    replace(tempname, filepath)
+        
 
 def monitor_wg(interval=5): 
     prev_states = set()
@@ -29,7 +34,7 @@ def monitor_wg(interval=5):
             curr_peers = set(connected.keys())
 
             if curr_peers != prev_states:
-                write_to_file(peers)
+                write_to_file(connected)
             prev_states = curr_peers
                 
 

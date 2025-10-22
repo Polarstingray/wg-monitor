@@ -3,10 +3,6 @@ from subprocess import run
 from os import path
 from json import load
 
-# BASE_DIR = path.dirname(path.abspath(__file__))
-# LIB_DIR = path.join(BASE_DIR, "lib")
-# CONFIG_DIR = path.join(BASE_DIR, "config")
-
 peer_states = {}
 
 class WgAPI :
