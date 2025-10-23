@@ -7,8 +7,7 @@ peer_states = {}
 
 class WgAPI :
 
-    def __init__(self, lib_dir=None, config_dir=None, iface='wg0') :
-        base_dir = path.dirname(path.abspath(__file__))
+    def __init__(self, base_dir=path.dirname(path.abspath(__file__)), iface='wg0') :
         self.lib_dir = path.join(base_dir, "lib")
         self.config_dir = path.join(base_dir, "config")
         self.iface = iface

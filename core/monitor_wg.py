@@ -28,7 +28,6 @@ def write_to_json(peers, filepath=STATE_FILE) :
     replace(tempname, filepath)
         
 def log(peers, filepath=CONNECTIONS_LOG, status_=0) :
-    print(peers)
     update = ''
     status = '[+] UP' if (status_ == 0) else '[-] DOWN'
     for name, peer_info in peers.items() :
@@ -36,14 +35,17 @@ def log(peers, filepath=CONNECTIONS_LOG, status_=0) :
 
     with open(filepath, 'a') as log :
         log.write(update)
+    return update.strip()
 
 def monitor_wg(interval=5): 
     prev_states = set()
     while True:
         try :
+            # querry peer handshakes
             peers = wg_api.get_peers()
-            connected = wg_api.get_connected(peers)
+            connected = wg_api.get_connected(peers) 
             disconnected = [k for k in peers.keys() if k not in connected.keys()] # peers xor connected
+            updates = []
 
             curr_peers = set(connected.keys())
             if curr_peers != prev_states:
@@ -51,25 +53,32 @@ def monitor_wg(interval=5):
                 newly_connected = list(curr_peers - prev_states)
                 newly_disconnected = list(prev_states - curr_peers)
                 if newly_connected :
-                    log({k: connected[k] for k in newly_connected}, status_=0)
+                    updates.append(log({k: connected[k] for k in newly_connected}, status_=0))
                 if newly_disconnected :
-                    log({k : peers[k] for k in newly_disconnected}, filepath=DISCONNECTIONS_LOG, status_=1)
+                    updates.append(log({k : peers[k] for k in newly_disconnected}, filepath=DISCONNECTIONS_LOG, status_=1))
             prev_states = curr_peers
 
-            system('clear')
-            print("="*20 + "Peer Status" + "="*20)
-            for peer, peer_info in connected.items():
-                print(f"[+] {peer} - Recent handshake:\n {peer_info}")
-
-            for peer in disconnected:
-                print(f"[-] {peer} - Disconnected peer:\n {peers[peer]}")
-            delay(interval, verbose=True)
+            console_log(connected, disconnected, updates)
+            delay(interval)
 
         except Exception as e:
             print(f"Error: {e}")
 
-def delay(interval=5, verbose=False) :
-    if (verbose) :
+def console_log(connected, disconnected, notifications) :
+    # Console output
+    print("="*20 + "Peer Status" + "="*20)
+    for peer, peer_info in connected.items():
+        print(f"[+] {peer} - Recent handshake:\n {peer_info}")
+
+    for peer in disconnected:
+        print(f"[-] {peer} - Disconnected peer")
+
+    for noti in notifications :
+        print(f'  [NOTIFICATION]: {noti}')
+
+def delay(interval=5, verbose=True) :
+    # clears terminal output and displays loading (...)s
+    if (not verbose) :
         for i in range(1, interval+1) :
             sleep(1)
             if i % interval == 0 :
@@ -78,6 +87,7 @@ def delay(interval=5, verbose=False) :
             else :
                 print(".", end="")
             stdout.flush()
+        system('clear')
     else :
         sleep(interval)
         
