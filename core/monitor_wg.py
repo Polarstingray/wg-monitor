@@ -3,18 +3,20 @@
 
 from os import path, system, makedirs, fsync, replace
 from time import sleep
-from sys import stdout
-from core.wg_api import wg_api
+from sys import stdout, path as sys_path
 import json, tempfile
 from datetime import datetime
 
 BASE_DIR = path.join(path.dirname(path.abspath(__file__)), '../')
 STATE_FILE = path.join(BASE_DIR, "tmp/state.json")
+sys_path.append(path.abspath(path.join(BASE_DIR, "core/"))) # add core/ to imports directory
 makedirs(path.join(BASE_DIR, "tmp/"), exist_ok=True)
 
 CONNECTIONS_LOG = path.join(BASE_DIR, "log/connections.log")
 DISCONNECTIONS_LOG = path.join(BASE_DIR, "log/disconnections.log")
 makedirs(path.join(BASE_DIR, "log/"), exist_ok=True)
+
+from wg_api.wg_api import wg_api
 
 def write_to_json(peers, filepath=STATE_FILE) :
     dirpath = path.dirname(filepath)
@@ -81,5 +83,5 @@ def delay(interval=5, verbose=False) :
         
 
 if __name__ == "__main__":
-    # monitor_wg()
+    monitor_wg()
     pass
