@@ -4,11 +4,11 @@
 from os import path, system, makedirs, fsync, replace
 from time import sleep
 from sys import stdout
-from wg_api import wg_api
+from core.wg_api import wg_api
 import json, tempfile
 from datetime import datetime
 
-BASE_DIR = path.dirname(path.abspath(__file__))
+BASE_DIR = path.join(path.dirname(path.abspath(__file__)), '../')
 STATE_FILE = path.join(BASE_DIR, "tmp/state.json")
 makedirs(path.join(BASE_DIR, "tmp/"), exist_ok=True)
 
@@ -61,7 +61,6 @@ def monitor_wg(interval=5):
 
             for peer in disconnected:
                 print(f"[-] {peer} - Disconnected peer:\n {peers[peer]}")
-
             delay(interval, verbose=True)
 
         except Exception as e:
@@ -82,4 +81,5 @@ def delay(interval=5, verbose=False) :
         
 
 if __name__ == "__main__":
-    monitor_wg()
+    # monitor_wg()
+    pass
