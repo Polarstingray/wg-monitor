@@ -1,0 +1,38 @@
+#!/bin/bash
+
+if [ $# -ne 2 ]; then
+    echo "Error: 2 arguments required <name> <subnet_ip>"
+    exit 1
+fi
+name=$1
+ip=$2
+
+#change wg0 to your wireguard interface, default wg0
+iface_key=$(docker exec -it wireguard wg show wg0 public-key)
+priv=$(wg genkey)
+pub=$(echo "$priv" | wg pubkey)
+
+# Change to your wireguard config file
+cat <<EOF >> /srv/docker/wireguard/config/wg_confs/wg0.conf
+[Peer]
+# $name
+PublicKey = $pub
+AllowedIPs = $ip/32
+EOF
+
+# Change endpoint to your public ip
+# Change DNS to your wg DNS
+cat > "/srv/docker/wireguard/config/peers/$name.conf" <<EOF
+[Interface]
+PrivateKey = $priv
+Address = $ip/32
+DNS = 1.1.1.1
+
+[Peer]
+PublicKey = $iface_key
+Endpoint = YourPublicIpOrDomain:51820
+AllowedIPs = 0.0.0.0/0, ::/0
+EOF
+
+docker exec -it wireguard wg-quick down wg0 && docker exec -it wireguard wg-quick up wg0
+
