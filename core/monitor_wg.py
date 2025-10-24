@@ -6,6 +6,7 @@ from time import sleep
 from sys import stdout, path as sys_path
 import json, tempfile
 from datetime import datetime
+from subprocess import run
 
 BASE_DIR = path.join(path.dirname(path.abspath(__file__)), '../')
 STATE_FILE = path.join(BASE_DIR, "tmp/state.json")
@@ -35,6 +36,10 @@ def log(peers, filepath=CONNECTIONS_LOG, status_=0) :
 
     with open(filepath, 'a') as log :
         log.write(update)
+    try :
+        if (status_ == 0) : run(["wall", f"[wg-monitor] Updated peers:\n{update}"])
+    except Exception :
+        pass
     return update.strip()
 
 def monitor_wg(interval=5): 

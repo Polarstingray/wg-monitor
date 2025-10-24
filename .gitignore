@@ -3,3 +3,4 @@ log/*
 tmp/state.json
 .env
 __pycache__/*
+venv/*

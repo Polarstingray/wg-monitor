@@ -116,7 +116,7 @@ class WgAPI :
 
     def is_recent_handshake(self, handshake_time):
         """Check if the handshake time is within the last 2 minutes."""
-        return handshake_time <= 120
+        return handshake_time <= 130
 
 
 wg_api = WgAPI()
