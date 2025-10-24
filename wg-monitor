@@ -1,0 +1,4 @@
+#!/bin/bash
+# displays system daemon's standard output continously
+# store in /usr/local/bin for unix machines
+journalctl -u wg-monitor -f

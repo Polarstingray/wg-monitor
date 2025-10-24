@@ -1,0 +1,21 @@
+
+
+[Unit]
+Description=WireGuard Connection Monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/wg-monitor
+ExecStart=/opt/wg-monitor/venv/bin/python3 -u /opt/wg-monitor/main.py
+Restart=always
+RestartSec=5
+User=root
+
+StandardOutput=journal
+#StandardOutput=append:/opt/wg-monitor/log/systemd.log
+StandardError=append:/opt/wg-monitor/log/systemd.err
+
+[Install]
+WantedBy=multi-user.target
