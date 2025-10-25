@@ -7,6 +7,9 @@ from sys import stdout, path as sys_path
 import json, tempfile
 from datetime import datetime
 from subprocess import run
+from requests import post
+
+WEBHOOK_URL = "http://localhost:5000/api/peer-update"
 
 BASE_DIR = path.join(path.dirname(path.abspath(__file__)), '../')
 STATE_FILE = path.join(BASE_DIR, "tmp/state.json")
@@ -27,12 +30,17 @@ def write_to_json(peers, filepath=STATE_FILE) :
         fsync(tmpfile.fileno())
         tempname = tmpfile.name
     replace(tempname, filepath)
-        
-def log(peers, filepath=CONNECTIONS_LOG, status_=0) :
+
+def log(updated_peers, filepath=CONNECTIONS_LOG, status_=0) :
     update = ''
-    status = '[+] UP' if (status_ == 0) else '[-] DOWN'
-    for name, peer_info in peers.items() :
-        update += f'{status} {name} [{peer_info.get("ip")}] from [{peer_info.get('endpoint').get('ip')}] - {str(datetime.now())}\n'
+    if not updated_peers :
+        return update
+    for state, peers in updated_peers.items() :
+        print(state)
+        status = '[+] UP' if (state == "connected") else '[-] DOWN'
+        for name, peer_info in peers.items() :
+            print(peer_info)
+            update += f'{status} {name} [{peer_info.get("ip")}] from [{peer_info.get('endpoint').get('ip')}] - {str(datetime.now())}\n'
 
     with open(filepath, 'a') as log :
         log.write(update)
@@ -55,12 +63,8 @@ def monitor_wg(interval=5):
             curr_peers = set(connected.keys())
             if curr_peers != prev_states:
                 write_to_json(peers) # update all states in tmp/state.json
-                newly_connected = list(curr_peers - prev_states)
-                newly_disconnected = list(prev_states - curr_peers)
-                if newly_connected :
-                    updates.append(log({k: connected[k] for k in newly_connected}, status_=0))
-                if newly_disconnected :
-                    updates.append(log({k : peers[k] for k in newly_disconnected}, filepath=DISCONNECTIONS_LOG, status_=1))
+                newly_updated = get_newly_updated(peers, curr_peers, prev_states)
+                updates.append(log(newly_updated))
             prev_states = curr_peers
 
             console_log(connected, disconnected, updates)
@@ -68,6 +72,16 @@ def monitor_wg(interval=5):
 
         except Exception as e:
             print(f"Error: {e}")
+
+def get_newly_updated(peers, curr, prev) :
+        connected = list(curr - prev)
+        disconnected = list(prev - curr)
+        newly_updated = {}
+        if connected :
+            newly_updated["connected"] = {k: peers[k] for k in connected}
+        if disconnected :
+            newly_updated["disconnected"] = {k: peers[k] for k in disconnected}
+        return newly_updated
 
 def console_log(connected, disconnected, notifications) :
     # Console output
