@@ -5,7 +5,8 @@ from os import path, system, makedirs, fsync, replace
 from time import sleep
 from sys import stdout, path as sys_path
 import json, tempfile
-from logger import update_logger
+from logger import update_logger, log_format
+from subprocess import run
 
 # WEBHOOK_URL = "http://localhost:5000/api/peer-update"
 
@@ -25,18 +26,21 @@ def write_to_json(peers, filepath=STATE_FILE) :
         tempname = tmpfile.name
     replace(tempname, filepath)
 
-# def notify_web_app(updated_peers, status=0, url=WEBHOOK_URL) :
+# def notify_web_app(update, status=0, url=WEBHOOK_URL) :
+#     for up in update :
+#         up = up.split(" - ", 1)
+
 #     try :
 #         payload = {
 #             "status" : "connected" if (status==0) else "disconnected",
 #             "timestamp" : datetime.now().isoformat(),
-#             "peers" : updated_peers
+#             "peers" : update
 #         }
 #         post(url, json=payload, timeout=2)
 #     except Exception as e :
 #         print(f'[!] Failed to send update to web app: {e}')
 
-def console_log(connected, disconnected, update) :
+def console_log(connected, disconnected, updates) :
     # Console output
     print("="*20 + "Peer Status" + "="*20)
     for peer, peer_info in connected.items():
@@ -45,44 +49,51 @@ def console_log(connected, disconnected, update) :
     for peer in disconnected:
         print(f"[-] {peer} - Disconnected peer")
 
-    for notification in update :
-        print(f'  [NOTIFICATION]: {notification.strip()}')
+    notification = []
+    for event in updates :
+        notice = log_format(event)
+        if event.get('status') :
+            notification.append(notice)
+        print(f'  [NOTIFICATION]: {notice}')
+
+    if notification : run(['wall', f'[wg-monitor] Updated peers: \n{'\n'.join(notification)}']) # Notify server
 
 class WgMonitor :
     def __init__(self) :
         self.prev_states = set()
-
+        self.peers = {}
+  
     def run(self, interval=5): 
         while True:
             try :
                 self.check_peers()
-                wg_monitor.delay(interval)
+                WgMonitor.delay(interval)
             except Exception as e:
                 print(f"Error: {e}")
 
     def check_peers(self) :
         # querry peer handshakes
-        peers = wg_api.get_peers()
-        connected = wg_api.get_connected(peers) 
-        disconnected = [k for k in peers.keys() if k not in connected.keys()] # peers xor connected
+        self.peers = wg_api.get_peers()
+        connected = wg_api.get_connected(self.peers) 
+        disconnected = [k for k in self.peers.keys() if k not in connected.keys()] # peers xor connected
 
         curr_peers = set(connected.keys())
-        update = []
+        updates = []
         if curr_peers != self.prev_states:
-            write_to_json(peers) # update all states in tmp/state.json
-            newly_updated = self.get_newly_updated(peers, curr_peers)
-            update = update_logger.log(newly_updated)
+            write_to_json(self.peers) # update all states in tmp/state.json
+            newly_updated = self.get_newly_updated(curr_peers)
+            updates = update_logger.log(newly_updated)
         self.prev_states = curr_peers        
-        console_log(connected, disconnected, update)
+        console_log(connected, disconnected, updates)
 
-    def get_newly_updated(self, peers, curr) :
+    def get_newly_updated(self, curr) :
             connected = list(curr - self.prev_states)
             disconnected = list(self.prev_states - curr)
             newly_updated = {}
             if connected :
-                newly_updated["connected"] = {k: peers[k] for k in connected}
+                newly_updated["connected"] = {k: self.peers[k] for k in connected}
             if disconnected :
-                newly_updated["disconnected"] = {k: peers[k] for k in disconnected}
+                newly_updated["disconnected"] = {k: self.peers[k] for k in disconnected}
             return newly_updated
 
     @staticmethod

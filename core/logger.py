@@ -2,6 +2,8 @@ from io import StringIO
 import logging
 from os import makedirs, path
 from subprocess import run
+from datetime import datetime
+
 
 BASE_DIR = path.join(path.dirname(path.abspath(__file__)), '../')
 LOG_DIR = path.join(BASE_DIR, "log/")
@@ -11,13 +13,12 @@ class UpdateLogger :
         self.log_dir = log_dir
         makedirs(self.log_dir, exist_ok=True)
 
-        self.log_stream = StringIO()
         self.update_logger = logging.getLogger('update_logger')
         self.update_logger.setLevel(logging.INFO)
         self._setup_handlers()
 
     def _setup_handlers(self):
-        format = '%(message)s - %(levelname)s - %(asctime)s'
+        format = '%(message)s'
         # update log handler
         update_handler = logging.FileHandler(f'{self.log_dir}/updates.log')
         update_handler.setFormatter(
@@ -25,17 +26,10 @@ class UpdateLogger :
         )
         self.update_logger.addHandler(update_handler)
 
-        # captures log message
-        stream_handler = logging.StreamHandler(self.log_stream)
-        stream_handler.setFormatter(
-            logging.Formatter(format)
-        )
-        self.update_logger.addHandler(stream_handler)
-
         # Error log handler
         error_handler = logging.FileHandler(f'{self.log_dir}/errors.log')
         error_handler.setFormatter(
-            logging.Formatter(format)
+            logging.Formatter('%(levelname)s - %(message)s - %(asctime)s')
         )
         error_handler.setLevel(logging.ERROR)
         self.update_logger.addHandler(error_handler)
@@ -52,25 +46,32 @@ class UpdateLogger :
         Returns:
             str: The log message that was written.
         """
-        update = []
+        updates = []
         if not updated_peers :
-            return update
+            return updates
         for state, peers in updated_peers.items() :
-            status = '[+] UP' if (state == "connected") else '[-] DOWN'
             for name, peer_info in peers.items() :
                 try :
-                    self.update_logger.info(f'{status} {name} [{peer_info.get("ip")}] from [{peer_info.get("endpoint", {}).get("ip")}]')
+                    event = {
+                        "status": True if state == "connected" else False,
+                        "name": name,
+                        "ip": peer_info.get("ip"),
+                        "endpoint": peer_info.get("endpoint", {}).get("ip"),
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    self.update_logger.info(log_format(event))
+                    updates.append(event)
                 except Exception as e :
-                    print(f"Error: {str(e)}") 
                     self.update_logger.error(
                         f"Error: {str(e)}",
                         exc_info=True
                     )
                     raise
-                self.log_stream.seek(0)
-                notification = self.log_stream.getvalue()
-                update.append(notification)
-            if (state == "connected") : run(['wall', f'[wg-monitor] Updated peers: \n{''.join(update)}']) # Notify server
-        return update
+        return updates
+    
+def log_format(event) :
+    status = '[+] UP' if (event.get("status")) else '[-] DOWN'
+    return f'{status} - {event.get('name')} [{event.get('ip')}] from [{event.get('endpoint')}] - {event.get('timestamp')}'
+                
 
 update_logger = UpdateLogger()
