@@ -18,11 +18,10 @@ class UpdateLogger :
         self._setup_handlers()
 
     def _setup_handlers(self):
-        format = '%(message)s'
         # update log handler
         update_handler = logging.FileHandler(f'{self.log_dir}/updates.log')
         update_handler.setFormatter(
-            logging.Formatter(format)
+            logging.Formatter('%(message)s')
         )
         self.update_logger.addHandler(update_handler)
 
@@ -73,5 +72,4 @@ def log_format(event) :
     status = '[+] UP' if (event.get("status")) else '[-] DOWN'
     return f'{status} - {event.get('name')} [{event.get('ip')}] from [{event.get('endpoint')}] - {event.get('timestamp')}'
                 
-
 update_logger = UpdateLogger()

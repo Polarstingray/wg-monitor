@@ -2,20 +2,19 @@
 #!/bin/python3
 
 from os import path, system, makedirs, fsync, replace
+from sys import stdout
 from time import sleep
-from sys import stdout, path as sys_path
 import json, tempfile
-from logger import update_logger, log_format
 from subprocess import run
+from logger import update_logger, log_format
+from wg_api.wg_api import wg_api
 
 # WEBHOOK_URL = "http://localhost:5000/api/peer-update"
 
 BASE_DIR = path.join(path.dirname(path.abspath(__file__)), '../')
 STATE_FILE = path.join(BASE_DIR, "tmp/state.json")
-sys_path.append(path.abspath(path.join(BASE_DIR, "core/"))) # add core/ to imports directory
 makedirs(path.join(BASE_DIR, "tmp/"), exist_ok=True)
 
-from wg_api.wg_api import wg_api
 
 def write_to_json(peers, filepath=STATE_FILE) :
     dirpath = path.dirname(filepath)
@@ -27,6 +26,7 @@ def write_to_json(peers, filepath=STATE_FILE) :
     replace(tempname, filepath)
 
 # def notify_web_app(update, status=0, url=WEBHOOK_URL) :
+
 #     for up in update :
 #         up = up.split(" - ", 1)
 
