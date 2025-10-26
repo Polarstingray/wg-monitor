@@ -5,7 +5,6 @@ from os import path, system, makedirs, fsync, replace
 from time import sleep
 from sys import stdout, path as sys_path
 import json, tempfile
-from requests import post
 from logger import update_logger
 
 # WEBHOOK_URL = "http://localhost:5000/api/peer-update"
