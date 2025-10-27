@@ -2,5 +2,6 @@ tmp/*
 log/*
 tmp/state.json
 .env
-__pycache__/*
+__pycache__/
 venv/*
+*.pyc
