@@ -12,6 +12,7 @@ from logger import update_logger, log_format
 from wg_api.wg_api import wg_api
 
 WEBHOOK_URL = "http://localhost:5000/api/wg/update"
+WEB_APP_EXT = False
 
 BASE_DIR = path.join(path.dirname(path.abspath(__file__)), '../')
 STATE_FILE = path.join(BASE_DIR, "tmp/state.json")
@@ -84,7 +85,7 @@ class WgMonitor :
             updates = update_logger.log(newly_updated)
         self.prev_states = curr_peers        
         console_log(connected, disconnected, updates)
-        notify_web_app(updates)
+        if (WEB_APP_EXT and updates) : notify_web_app(updates)
 
     def get_newly_updated(self, curr) :
             connected = list(curr - self.prev_states)
