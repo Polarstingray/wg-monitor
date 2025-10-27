@@ -6,16 +6,18 @@ from sys import stdout
 from time import sleep
 import json, tempfile
 from subprocess import run
+
+from requests import post
 from logger import update_logger, log_format
 from wg_api.wg_api import wg_api
 
-# WEBHOOK_URL = "http://localhost:5000/api/peer-update"
+WEBHOOK_URL = "http://localhost:5000/api/wg/update"
 
 BASE_DIR = path.join(path.dirname(path.abspath(__file__)), '../')
 STATE_FILE = path.join(BASE_DIR, "tmp/state.json")
 makedirs(path.join(BASE_DIR, "tmp/"), exist_ok=True)
 
-
+# Issue in being able to read state
 def write_to_json(peers, filepath=STATE_FILE) :
     dirpath = path.dirname(filepath)
     with tempfile.NamedTemporaryFile("w", dir=dirpath, delete=False) as tmpfile :
@@ -25,20 +27,17 @@ def write_to_json(peers, filepath=STATE_FILE) :
         tempname = tmpfile.name
     replace(tempname, filepath)
 
-# def notify_web_app(update, status=0, url=WEBHOOK_URL) :
+def notify_web_app(updates, url=WEBHOOK_URL) :
+    if not updates :
+        return
+    try :
+        payload = {
+            "update" : updates,
+        }
+        post(url, json=payload, timeout=2)
 
-#     for up in update :
-#         up = up.split(" - ", 1)
-
-#     try :
-#         payload = {
-#             "status" : "connected" if (status==0) else "disconnected",
-#             "timestamp" : datetime.now().isoformat(),
-#             "peers" : update
-#         }
-#         post(url, json=payload, timeout=2)
-#     except Exception as e :
-#         print(f'[!] Failed to send update to web app: {e}')
+    except Exception as e :
+        print(f'[!] Failed to send update to web app: {e}')
 
 def console_log(connected, disconnected, updates) :
     # Console output
@@ -75,7 +74,7 @@ class WgMonitor :
         # querry peer handshakes
         self.peers = wg_api.get_peers()
         connected = wg_api.get_connected(self.peers) 
-        disconnected = [k for k in self.peers.keys() if k not in connected.keys()] # peers xor connected
+        disconnected = [k for k in self.peers.keys() if k not in connected.keys()]
 
         curr_peers = set(connected.keys())
         updates = []
@@ -85,6 +84,7 @@ class WgMonitor :
             updates = update_logger.log(newly_updated)
         self.prev_states = curr_peers        
         console_log(connected, disconnected, updates)
+        notify_web_app(updates)
 
     def get_newly_updated(self, curr) :
             connected = list(curr - self.prev_states)
