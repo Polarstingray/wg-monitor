@@ -1,7 +1,7 @@
 
 #!/bin/python3
 
-from os import path, system, makedirs, fsync, replace, chown, stat
+from os import path, system, makedirs, fsync, replace, chown, chmod, stat
 from grp import getgrnam
 from sys import stdout
 from time import sleep
@@ -29,6 +29,7 @@ def write_to_json(peers, filepath=STATE_FILE) :
         tempname = tmpfile.name
     replace(tempname, filepath)
     chown(filepath, stat(filepath).st_uid, getgrnam("serv-api").gr_gid)
+    chmod(filepath, 0o640)
 
 def notify_web_app(updates, url=WEBHOOK_URL) :
     if not updates :
@@ -58,7 +59,8 @@ def console_log(connected, disconnected, updates) :
             notification.append(notice)
         print(f'  [NOTIFICATION]: {notice}')
 
-    if notification : run(['wall', f'[wg-monitor] Updated peers: \n{'\n'.join(notification)}']) # Notify server
+    if notification : run(
+        ['wall', f'[wg-monitor] Updated peers: \n{'\n'.join(notification)}']) # Notify server
 
 class WgMonitor :
     def __init__(self) :
