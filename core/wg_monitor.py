@@ -1,7 +1,8 @@
 
 #!/bin/python3
 
-from os import path, system, makedirs, fsync, replace
+from os import path, system, makedirs, fsync, replace, chown, stat
+from grp import getgrnam
 from sys import stdout
 from time import sleep
 import json, tempfile
@@ -27,6 +28,7 @@ def write_to_json(peers, filepath=STATE_FILE) :
         fsync(tmpfile.fileno())
         tempname = tmpfile.name
     replace(tempname, filepath)
+    chown(filepath, stat(filepath).st_uid, getgrnam("serv-api").gr_gid)
 
 def notify_web_app(updates, url=WEBHOOK_URL) :
     if not updates :
