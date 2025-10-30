@@ -1,11 +1,11 @@
 
 #!/bin/python3
 
-from os import path, system, makedirs, fsync, replace, chown, chmod, stat
+import os, json, tempfile, time
+from pwd import getpwnam
 from grp import getgrnam
 from sys import stdout
 from time import sleep
-import json, tempfile
 from subprocess import run
 
 from requests import post
@@ -13,35 +13,11 @@ from logger import update_logger, log_format
 from wg_api.wg_api import wg_api
 
 WEBHOOK_URL = "http://localhost:5000/api/wg/update"
-WEB_APP_EXT = False
+WEB_APP_EXT = True
 
-BASE_DIR = path.join(path.dirname(path.abspath(__file__)), '../')
-STATE_FILE = path.join(BASE_DIR, "tmp/state.json")
-makedirs(path.join(BASE_DIR, "tmp/"), exist_ok=True)
-
-# Issue in being able to read state
-def write_to_json(peers, filepath=STATE_FILE) :
-    dirpath = path.dirname(filepath)
-    with tempfile.NamedTemporaryFile("w", dir=dirpath, delete=False) as tmpfile :
-        json.dump(peers, tmpfile, indent=2)
-        tmpfile.flush()
-        fsync(tmpfile.fileno())
-        tempname = tmpfile.name
-    replace(tempname, filepath)
-    chown(filepath, stat(filepath).st_uid, getgrnam("serv-api").gr_gid)
-    chmod(filepath, 0o640)
-
-def notify_web_app(updates, url=WEBHOOK_URL) :
-    if not updates :
-        return
-    try :
-        payload = {
-            "update" : updates,
-        }
-        post(url, json=payload, timeout=2)
-
-    except Exception as e :
-        print(f'[!] Failed to send update to web app: {e}')
+BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../')
+STATE_FILE = os.path.join(BASE_DIR, "tmp/state.json")
+os.makedirs(os.path.join(BASE_DIR, "tmp/"), exist_ok=True)
 
 def console_log(connected, disconnected, updates) :
     # Console output
@@ -60,20 +36,62 @@ def console_log(connected, disconnected, updates) :
         print(f'  [NOTIFICATION]: {notice}')
 
     if notification : run(
-        ['wall', f'[wg-monitor] Updated peers: \n{'\n'.join(notification)}']) # Notify server
+        ['wall', f"[wg-monitor] Updated peers: \n{'\n'.join(notification)}"]) # Notify server
+        
+class StateMgr :
+    def __init__(self, file_path=STATE_FILE, owner=os.getuid(), group='serv-api') :
+        self.filepath=file_path
+        self.owner = getpwnam(owner).pw_uid if isinstance(owner, str) else (owner or os.getuid())
+        self.group=getgrnam(group).gr_gid
+
+    # Issue in being able to read state
+    def save(self, peers) :
+        dirpath = os.path.dirname(self.filepath)
+        with tempfile.NamedTemporaryFile("w", dir=dirpath, delete=False) as tmpfile :
+            json.dump(peers, tmpfile, indent=2)
+            tmpfile.flush()
+            os.fsync(tmpfile.fileno())
+            tempname = tmpfile.name
+        os.replace(tempname, self.filepath)
+        os.chown(self.filepath, self.owner, self.group)
+        os.chmod(self.filepath, 0o640)
+
+class WebNotifier :
+    def __init__(self, url=WEBHOOK_URL, cooldown=6) :
+        self.last_update = 0 - cooldown
+        self.url = url
+        self.cooldown = cooldown
+    
+    def send_update(self, updates) :
+        curr_time = time.time()
+        print(curr_time - self.last_update > self.cooldown)
+        if (not updates) or (curr_time - self.last_update > self.cooldown):
+            return
+        try :
+            payload = {
+                "update" : updates,
+            }
+            post(self.url, json=payload, timeout=2)
+            self.last_update = time.time()
+        except Exception as e :
+            print(f'[!] Failed to send update to web app: {e}')
 
 class WgMonitor :
     def __init__(self) :
         self.prev_states = set()
         self.peers = {}
+        self.state_mgr = StateMgr(owner='penguin') # for debugging purposes, this must be chang
+        self.web_notifier = WebNotifier()
   
     def run(self, interval=5): 
         while True:
             try :
-                self.check_peers()
-                WgMonitor.delay(interval)
+                connected, disconnected, updates = self.check_peers()
+                console_log(connected, disconnected, updates)
+                if (WEB_APP_EXT and updates) : self.web_notifier.send_update(updates)
             except Exception as e:
                 print(f"Error: {e}")
+            WgMonitor.delay(interval)
 
     def check_peers(self) :
         # querry peer handshakes
@@ -84,12 +102,13 @@ class WgMonitor :
         curr_peers = set(connected.keys())
         updates = []
         if curr_peers != self.prev_states:
-            write_to_json(self.peers) # update all states in tmp/state.json
+            self.state_mgr.save(self.peers) # update all states in tmp/state.json
+
             newly_updated = self.get_newly_updated(curr_peers)
             updates = update_logger.log(newly_updated)
         self.prev_states = curr_peers        
-        console_log(connected, disconnected, updates)
-        if (WEB_APP_EXT and updates) : notify_web_app(updates)
+
+        return connected, disconnected, updates
 
     def get_newly_updated(self, curr) :
             connected = list(curr - self.prev_states)
@@ -113,7 +132,7 @@ class WgMonitor :
                 else :
                     print(".", end="")
                 stdout.flush()
-            system('clear')
+            os.system('clear')
         else :
             sleep(interval)
             

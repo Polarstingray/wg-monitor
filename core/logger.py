@@ -68,6 +68,6 @@ class UpdateLogger :
     
 def log_format(event) :
     status = '[+] UP' if (event.get("status")) else '[-] DOWN'
-    return f'{status} - {event.get('name')} [{event.get('ip')}] from [{event.get('endpoint')}] - {event.get('timestamp')}'
-                
+    return f'{status} - {event.get('name')} [{event.get('ip')}] from [{event.get('endpoint')}] - {event.get('timestamp')}'   
+        
 update_logger = UpdateLogger()
