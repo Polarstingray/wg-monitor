@@ -12,34 +12,12 @@ from requests import post
 
 from logger import update_logger, log_format
 from wg_api.wg_api import wg_api
+import config
 
-load_dotenv()
 
-# environment variables
-WEBHOOK_URL ="WEBHOOK"
-WEB_EXT = "WEBEXT"
-WG_OWNER =  'WGMON_OWNER'
-WG_GROUP = 'WGMON_GROUP'
-EXCPECTED_ENV_VARS = [WEBHOOK_URL, WEB_EXT, WG_OWNER, WG_GROUP]
-ENV_VARS = {}
-for var in EXCPECTED_ENV_VARS :
-    default = None
-    match var :
-        case "WEBHOOK" : default = "http://localhost:5000/api/wg/update"
-        case "WEBEXT" : default = "False"
-
-    if not os.getenv(var, default) :
-        print(f'Expected {var} in *.env, please update environment variables.')
-        exit(1)
-    ENV_VARS[var] = os.getenv(var, default)
-if ENV_VARS.get(WEB_EXT) == "False" :
-    print(f"Not sending POST requests to: {ENV_VARS.get(WEBHOOK_URL)}")
-else :
-    print(f"Sending updates to: {ENV_VARS.get(WEBHOOK_URL)}")
-
-BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../')
-STATE_FILE = os.path.join(BASE_DIR, "tmp/state.json")
-os.makedirs(os.path.join(BASE_DIR, "tmp/"), exist_ok=True)
+# BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../')
+# STATE_FILE = os.path.join(BASE_DIR, "tmp/state.json")
+# os.makedirs(os.path.join(BASE_DIR, "tmp/"), exist_ok=True)
 
 def console_log(connected, disconnected, updates) :
     # Console output
@@ -61,7 +39,7 @@ def console_log(connected, disconnected, updates) :
         ['wall', f"[wg-monitor] Updated peers: \n{'\n'.join(notification)}"]) # Notify server
         
 class StateMgr :
-    def __init__(self, file_path=STATE_FILE, owner=os.getuid(), group='serv-api') :
+    def __init__(self, file_path=config.STATE_FILE, owner=os.getuid(), group='serv-api') :
         self.filepath=file_path
         self.owner = getpwnam(owner).pw_uid if isinstance(owner, str) else (owner or os.getuid())
         self.group=getgrnam(group).gr_gid
@@ -79,7 +57,7 @@ class StateMgr :
         os.chmod(self.filepath, 0o640)
 
 class WebNotifier :
-    def __init__(self, url=ENV_VARS.get(WEBHOOK_URL), cooldown=6) :
+    def __init__(self, url=config.WEBHOOK_URL, cooldown=config.WEB_COOLDOWN) :
         self.last_update = 0 - cooldown
         self.url = url
         self.cooldown = cooldown
@@ -100,21 +78,22 @@ class WebNotifier :
             print(f'[!] Failed to send update to web app: {e}')
 
 class WgMonitor :
-    def __init__(self) :
+    def __init__(self, interval=config.INTERVAL) :
+        self.interval=interval
         self.prev_states = set()
         self.peers = {}
-        self.state_mgr = StateMgr(owner=ENV_VARS.get(WG_OWNER) or os.getuid(), group=ENV_VARS.get(WG_GROUP)) 
+        self.state_mgr = StateMgr(owner=config.WG_OWNER, group=config.WG_GROUP) 
         self.web_notifier = WebNotifier()
   
-    def run(self, interval=5): 
+    def run(self): 
         while True:
             try :
                 connected, disconnected, updates = self.check_peers()
                 console_log(connected, disconnected, updates)
-                if (ENV_VARS.get(WEB_EXT) == "True"  and updates) : self.web_notifier.send_update(updates)
+                if (config.WEB_EXT  and updates) : self.web_notifier.send_update(updates)
             except Exception as e:
                 print(f"Error: {e}")
-            WgMonitor.delay(interval)
+            WgMonitor.delay(self.interval)
 
     def check_peers(self) :
         # querry peer handshakes
