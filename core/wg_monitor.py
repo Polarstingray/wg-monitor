@@ -7,13 +7,35 @@ from grp import getgrnam
 from sys import stdout
 from time import sleep
 from subprocess import run
-
+from dotenv import load_dotenv
 from requests import post
+
 from logger import update_logger, log_format
 from wg_api.wg_api import wg_api
 
-WEBHOOK_URL = "http://localhost:5000/api/wg/update"
-WEB_APP_EXT = True
+load_dotenv()
+
+# environment variables
+WEBHOOK_URL ="WEBHOOK"
+WEB_EXT = "WEBEXT"
+WG_OWNER =  'WGMON_OWNER'
+WG_GROUP = 'WGMON_GROUP'
+EXCPECTED_ENV_VARS = [WEBHOOK_URL, WEB_EXT, WG_OWNER, WG_GROUP]
+ENV_VARS = {}
+for var in EXCPECTED_ENV_VARS :
+    default = None
+    match var :
+        case "WEBHOOK" : default = "http://localhost:5000/api/wg/update"
+        case "WEBEXT" : default = "False"
+
+    if not os.getenv(var, default) :
+        print(f'Expected {var} in *.env, please update environment variables.')
+        exit(1)
+    ENV_VARS[var] = os.getenv(var, default)
+if ENV_VARS.get(WEB_EXT) == "False" :
+    print(f"Not sending POST requests to: {ENV_VARS.get(WEBHOOK_URL)}")
+else :
+    print(f"Sending updates to: {ENV_VARS.get(WEBHOOK_URL)}")
 
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../')
 STATE_FILE = os.path.join(BASE_DIR, "tmp/state.json")
@@ -57,13 +79,14 @@ class StateMgr :
         os.chmod(self.filepath, 0o640)
 
 class WebNotifier :
-    def __init__(self, url=WEBHOOK_URL, cooldown=6) :
+    def __init__(self, url=ENV_VARS.get(WEBHOOK_URL), cooldown=6) :
         self.last_update = 0 - cooldown
         self.url = url
         self.cooldown = cooldown
     
     def send_update(self, updates) :
         curr_time = time.time()
+        print(curr_time)
         print(curr_time - self.last_update > self.cooldown)
         if (not updates) or (curr_time - self.last_update > self.cooldown):
             return
@@ -80,7 +103,7 @@ class WgMonitor :
     def __init__(self) :
         self.prev_states = set()
         self.peers = {}
-        self.state_mgr = StateMgr(owner='penguin') # for debugging purposes, this must be chang
+        self.state_mgr = StateMgr(owner=ENV_VARS.get(WG_OWNER) or os.getuid(), group=ENV_VARS.get(WG_GROUP)) 
         self.web_notifier = WebNotifier()
   
     def run(self, interval=5): 
@@ -88,7 +111,7 @@ class WgMonitor :
             try :
                 connected, disconnected, updates = self.check_peers()
                 console_log(connected, disconnected, updates)
-                if (WEB_APP_EXT and updates) : self.web_notifier.send_update(updates)
+                if (ENV_VARS.get(WEB_EXT) == "True"  and updates) : self.web_notifier.send_update(updates)
             except Exception as e:
                 print(f"Error: {e}")
             WgMonitor.delay(interval)
